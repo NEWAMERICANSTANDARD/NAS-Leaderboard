@@ -81,13 +81,13 @@
   </div>
 
   <script>
-    // === CONFIG: locked to your exact sheet + tab (by gid) ===
-    const SHEET_ID  = "1nb8JW_8i4T8nljRsnxTCBz9pFsWJcEfXscvWNakxlgY";
-    const SHEET_GID = "1747425104"; // the tab you linked
+    // === CONFIG: uses your published 2PACX sheet and tries common gids ===
+    const PUBLISHED_DOC_ID = "2PACX-1vT15cYvooOqX2_SicJIooVvhI2gGGWuPhMO0ALpWIcLw-xBPt9V9QFDbtn5CJ1RZZoYeUqEgUnJkfDu";
+    const GIDS_TO_TRY = ["1747425104","0"]; // your tab first, then default sheet(0)
 
-    // Visualization API endpoint (public "Publish to web" required on that tab)
-    const GVIZ_URL = (id, gid) =>
-      `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:json&gid=${gid}&tq=${encodeURIComponent("select *")}`;
+    // Build the Visualization API URL from 2PACX + gid
+    const GVIZ_URL = (docE, gid) =>
+      `https://docs.google.com/spreadsheets/d/e/${docE}/gviz/tq?tqx=out:json&gid=${gid}&tq=${encodeURIComponent("select *")}`;
 
     const el = {
       tbody: document.getElementById("tbody"),
@@ -102,16 +102,20 @@
 
     let rawRows = [];
     let displayRows = [];
+    let activeGid = null;
 
     function errorOut(msg, detail){
       el.tbody.innerHTML = `<tr><td colspan="6" class="muted">${msg}</td></tr>`;
       if(detail) console.error(detail);
     }
 
-    // Robust parser (forgives header wording differences)
+    // Parse google.visualization JSON
     function parseGVizJSON(text){
+      if (!text.includes("google.visualization.Query.setResponse")) {
+        throw new Error("Sheet tab is not published to the web (or wrong gid).");
+      }
       const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}')+1));
-      if(!json.table || !json.table.rows) throw new Error("No table data returned");
+      if(!json.table || !json.table.rows) throw new Error("No table data.");
       const rows = json.table.rows.map(r => (r.c||[]).map(c => c ? c.v : ""));
 
       // Use the first non-empty row as header
@@ -119,6 +123,7 @@
       if(headerRowIndex < 0) return [];
       const headers = rows[headerRowIndex].map(h => String(h||"").trim());
 
+      // Flexible header matching
       const idx = {
         name:  headers.findIndex(h => /name/i.test(h)),
         city:  headers.findIndex(h => /(city|location)/i.test(h)),
@@ -167,7 +172,6 @@
         return matchesQ && matchesCity && matchesTier && matchesTime;
       });
 
-      // Sort: Highest Tier desc → Best Score desc → Most Recent desc
       displayRows.sort((a,b)=>{
         if(b.tier  !== a.tier)  return b.tier - a.tier;
         if(b.score !== a.score) return b.score - a.score;
@@ -199,7 +203,7 @@
       });
       el.tbody.appendChild(frag);
       el.count.textContent = `${displayRows.length} athlete${displayRows.length===1?"":"s"}`;
-      el.updated.textContent = "Updated: " + new Date().toLocaleString();
+      el.updated.textContent = "Updated: " + new Date().toLocaleString() + (activeGid?` • gid=${activeGid}`:"");
     }
 
     function populateCityFilter(){
@@ -207,19 +211,40 @@
       el.cityFilter.innerHTML = `<option value="">All cities</option>` + cities.map(c => `<option>${c}</option>`).join("");
     }
 
+    async function tryLoad(gid){
+      const url = GVIZ_URL(PUBLISHED_DOC_ID, gid);
+      const res = await fetch(url, {cache:"no-store"});
+      const text = await res.text();
+      const rows = parseGVizJSON(text);
+      return {rows, gid, url};
+    }
+
     async function load(){
       el.tbody.innerHTML = `<tr><td colspan="6" class="muted">Loading…</td></tr>`;
-      try{
-        const res = await fetch(GVIZ_URL(SHEET_ID, SHEET_GID), {cache:"no-store"});
-        if(!res.ok){ throw new Error(`HTTP ${res.status}`); }
-        const text = await res.text();
-        rawRows = parseGVizJSON(text);
-        populateCityFilter();
-        applyFilters();
-        render();
-      }catch(e){
-        errorOut("Couldn’t load data. Make sure this tab is **File → Share → Publish to web** and that the first row has headers (Name, City, Highest Tier, Best Score, Last Submitted).", e);
+      rawRows = []; activeGid = null;
+      for(const gid of GIDS_TO_TRY){
+        try{
+          const {rows, gid:used, url} = await tryLoad(gid);
+          if(rows && rows.length){
+            rawRows = rows; activeGid = used;
+            break;
+          }
+        }catch(e){
+          // try next gid
+          console.warn("gid failed:", gid, e);
+        }
       }
+      if(!rawRows.length){
+        const testUrl = GVIZ_URL(PUBLISHED_DOC_ID, GIDS_TO_TRY[0]);
+        errorOut(
+          `Couldn’t load data. Make sure your tab is published to the web and the gid is correct.
+          <br><small>Test this in your browser: <code>${testUrl}</code></small>`
+        );
+        return;
+      }
+      populateCityFilter();
+      applyFilters();
+      render();
     }
 
     el.search.addEventListener("input", ()=>{applyFilters();render();});
