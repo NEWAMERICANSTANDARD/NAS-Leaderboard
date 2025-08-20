@@ -1,260 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NAS Leaderboard</title>
   <style>
-    :root{
-      --bg:#0b0c10; --card:#121317; --muted:#a8b3c1; --text:#e8edf2; --accent:#59d185; --accent2:#7cc7ff;
-      --tableStripe:#0f1116; --chip:#1b1e26;
+    body {
+      font-family: Arial, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
     }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,Segoe UI,Roboto,Helvetica,Arial}
-    .wrap{max-width:1100px;margin:0 auto;padding:28px}
-    header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
-    h1{font-size:28px;margin:0}
-    .sub{color:var(--muted);font-size:13px}
-    .controls{display:flex;gap:10px;flex-wrap:wrap}
-    input,select{padding:10px 12px;border:1px solid #22252f;background:#0e1016;color:var(--text);border-radius:10px;outline:none}
-    .card{background:var(--card);border:1px solid #1b1f2a;border-radius:16px;padding:14px}
-    table{width:100%;border-collapse:separate;border-spacing:0}
-    thead th{position:sticky;top:0;background:var(--card);z-index:2}
-    th,td{padding:12px 14px;text-align:left;border-bottom:1px solid #1b1f2a}
-    tbody tr:nth-child(odd){background:var(--tableStripe)}
-    .rank{font-weight:700}
-    .chip{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--chip);border:1px solid #252a35;color:#dfe6ee;font-size:12px}
-    .tier{font-weight:700}
-    .num{font-variant-numeric:tabular-nums}
-    .muted{color:var(--muted)}
-    .right{margin-left:auto}
-    .footer{margin-top:10px;color:var(--muted);font-size:12px;display:flex;gap:12px;align-items:center}
-    .btn{cursor:pointer;border:none;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#0a0b0f;padding:10px 14px;border-radius:12px;font-weight:700}
-    @media (max-width:700px){ .hide-sm{display:none} }
+    h1 {
+      margin-bottom: 20px;
+    }
+    table {
+      width: 90%;
+      margin: auto;
+      border-collapse: collapse;
+      background: #161b22;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    }
+    th, td {
+      padding: 12px 15px;
+      border-bottom: 1px solid #30363d;
+    }
+    th {
+      background: #21262d;
+      color: #58a6ff;
+      text-transform: uppercase;
+      font-size: 14px;
+    }
+    tr:hover {
+      background: #30363d;
+    }
+    .rank {
+      font-weight: bold;
+      color: #ff7b72;
+    }
+    .name {
+      font-weight: bold;
+    }
+    .tier {
+      color: #3fb950;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div>
-        <h1>NAS Leaderboard</h1>
-        <div class="sub">Ranked by Highest Tier → Best Score → Most Recent</div>
-      </div>
-      <div class="controls">
-        <input id="search" placeholder="Search by name or city…" />
-        <select id="cityFilter"><option value="">All cities</option></select>
-        <select id="tierFilter">
-          <option value="">All tiers</option>
-          <option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
-        </select>
-        <select id="timeFilter">
-          <option value="">All time</option>
-          <option value="30">Last 30 days</option>
-          <option value="90">Last 90 days</option>
-          <option value="365">Last 365 days</option>
-        </select>
-        <button id="refresh" class="btn">Refresh</button>
-      </div>
-    </header>
-
-    <div class="card">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Name</th>
-            <th class="hide-sm">City</th>
-            <th>Highest&nbsp;Tier</th>
-            <th>Best&nbsp;Score</th>
-            <th class="hide-sm">Last&nbsp;Submitted</th>
-          </tr>
-        </thead>
-        <tbody id="tbody">
-          <tr><td colspan="6" class="muted">Loading…</td></tr>
-        </tbody>
-      </table>
-      <div class="footer">
-        <span id="count">0 athletes</span>
-        <span class="right muted" id="updated"></span>
-      </div>
-    </div>
-  </div>
+  <h1>New American Standard Leaderboard</h1>
+  <p>Updated automatically from Google Sheets</p>
+  <table id="leaderboard">
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Name</th>
+        <th>Tier</th>
+        <th>Best Score</th>
+        <th>City</th>
+        <th>Last Submitted</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
   <script>
-    // === CONFIG: uses your published 2PACX sheet and tries common gids ===
-    const PUBLISHED_DOC_ID = "2PACX-1vT15cYvooOqX2_SicJIooVvhI2gGGWuPhMO0ALpWIcLw-xBPt9V9QFDbtn5CJ1RZZoYeUqEgUnJkfDu";
-    const GIDS_TO_TRY = ["1747425104","0"]; // your tab first, then default sheet(0)
+    const SHEET_URL =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vT15cYvooOqX2_SicJIooVvhI2gGGWuPhMO0ALpWIcLw-xBPt9V9QFDbtn5CJ1RZZoYeUqEgUnJkfDu/gviz/tq?tqx=out:json&gid=1747425104&tq=select%20*";
 
-    // Build the Visualization API URL from 2PACX + gid
-    const GVIZ_URL = (docE, gid) =>
-      `https://docs.google.com/spreadsheets/d/e/${docE}/gviz/tq?tqx=out:json&gid=${gid}&tq=${encodeURIComponent("select *")}`;
+    async function loadData() {
+      try {
+        const res = await fetch(SHEET_URL);
+        const text = await res.text();
 
-    const el = {
-      tbody: document.getElementById("tbody"),
-      cityFilter: document.getElementById("cityFilter"),
-      tierFilter: document.getElementById("tierFilter"),
-      timeFilter: document.getElementById("timeFilter"),
-      search: document.getElementById("search"),
-      count: document.getElementById("count"),
-      updated: document.getElementById("updated"),
-      refresh: document.getElementById("refresh")
-    };
-
-    let rawRows = [];
-    let displayRows = [];
-    let activeGid = null;
-
-    function errorOut(msg, detail){
-      el.tbody.innerHTML = `<tr><td colspan="6" class="muted">${msg}</td></tr>`;
-      if(detail) console.error(detail);
-    }
-
-    // Parse google.visualization JSON
-    function parseGVizJSON(text){
-      if (!text.includes("google.visualization.Query.setResponse")) {
-        throw new Error("Sheet tab is not published to the web (or wrong gid).");
-      }
-      const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}')+1));
-      if(!json.table || !json.table.rows) throw new Error("No table data.");
-      const rows = json.table.rows.map(r => (r.c||[]).map(c => c ? c.v : ""));
-
-      // Use the first non-empty row as header
-      const headerRowIndex = rows.findIndex(r => r.some(x => String(x).trim() !== ""));
-      if(headerRowIndex < 0) return [];
-      const headers = rows[headerRowIndex].map(h => String(h||"").trim());
-
-      // Flexible header matching
-      const idx = {
-        name:  headers.findIndex(h => /name/i.test(h)),
-        city:  headers.findIndex(h => /(city|location)/i.test(h)),
-        tier:  headers.findIndex(h => /tier/i.test(h)),
-        score: headers.findIndex(h => /score/i.test(h)),
-        last:  headers.findIndex(h => /(last.*submitted|timestamp|date)/i.test(h))
-      };
-      if(idx.name < 0 || idx.tier < 0 || idx.score < 0){
-        throw new Error("Required columns not found (need Name, Tier, Score).");
-      }
-
-      const out = [];
-      for(let i = headerRowIndex + 1; i < rows.length; i++){
-        const r = rows[i] || [];
-        const get = (j) => (j >= 0 ? r[j] : "");
-        const lastVal = get(idx.last);
-        const lastDate = lastVal ? new Date(lastVal) : null;
-        out.push({
-          name:  String(get(idx.name) || ""),
-          city:  String(get(idx.city) || ""),
-          tier:  Number(get(idx.tier) || 0),
-          score: Number(get(idx.score) || 0),
-          last:  (lastDate && !isNaN(lastDate)) ? lastDate : null
-        });
-      }
-      return out.filter(r => r.name);
-    }
-
-    function formatDate(d){
-      if(!d) return "";
-      return d.toLocaleDateString([], {year:'numeric', month:'short', day:'2-digit'});
-    }
-
-    function applyFilters(){
-      const q = el.search.value.trim().toLowerCase();
-      const city = el.cityFilter.value;
-      const tierNum = el.tierFilter.value ? Number(el.tierFilter.value) : 0;
-      const days = parseInt(el.timeFilter.value || "0", 10);
-      const cutoff = days ? Date.now() - days*864e5 : 0;
-
-      displayRows = rawRows.filter(r=>{
-        const matchesQ    = !q || r.name.toLowerCase().includes(q) || r.city.toLowerCase().includes(q);
-        const matchesCity = !city || r.city === city;
-        const matchesTier = !tierNum || r.tier === tierNum;
-        const matchesTime = !cutoff || (r.last && r.last.getTime() >= cutoff);
-        return matchesQ && matchesCity && matchesTier && matchesTime;
-      });
-
-      displayRows.sort((a,b)=>{
-        if(b.tier  !== a.tier)  return b.tier - a.tier;
-        if(b.score !== a.score) return b.score - a.score;
-        return (b.last?.getTime()||0) - (a.last?.getTime()||0);
-      });
-    }
-
-    function render(){
-      el.tbody.innerHTML = "";
-      if(!displayRows.length){
-        el.tbody.innerHTML = `<tr><td colspan="6" class="muted">No results.</td></tr>`;
-        el.count.textContent = "0 athletes";
-        el.updated.textContent = "Updated: " + new Date().toLocaleString();
-        return;
-      }
-      const frag = document.createDocumentFragment();
-      displayRows.forEach((r,i)=>{
-        const badge = ["","🥉","🥈","🏅","🏆","👑"][Math.min(r.tier,5)];
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td class="rank">${i+1}</td>
-          <td>${r.name}</td>
-          <td class="hide-sm">${r.city || ""}</td>
-          <td><span class="chip tier">${badge||""} Tier ${r.tier}</span></td>
-          <td class="num">${r.score}</td>
-          <td class="hide-sm muted">${formatDate(r.last)}</td>
-        `;
-        frag.appendChild(tr);
-      });
-      el.tbody.appendChild(frag);
-      el.count.textContent = `${displayRows.length} athlete${displayRows.length===1?"":"s"}`;
-      el.updated.textContent = "Updated: " + new Date().toLocaleString() + (activeGid?` • gid=${activeGid}`:"");
-    }
-
-    function populateCityFilter(){
-      const cities = Array.from(new Set(rawRows.map(r => r.city).filter(Boolean))).sort();
-      el.cityFilter.innerHTML = `<option value="">All cities</option>` + cities.map(c => `<option>${c}</option>`).join("");
-    }
-
-    async function tryLoad(gid){
-      const url = GVIZ_URL(PUBLISHED_DOC_ID, gid);
-      const res = await fetch(url, {cache:"no-store"});
-      const text = await res.text();
-      const rows = parseGVizJSON(text);
-      return {rows, gid, url};
-    }
-
-    async function load(){
-      el.tbody.innerHTML = `<tr><td colspan="6" class="muted">Loading…</td></tr>`;
-      rawRows = []; activeGid = null;
-      for(const gid of GIDS_TO_TRY){
-        try{
-          const {rows, gid:used, url} = await tryLoad(gid);
-          if(rows && rows.length){
-            rawRows = rows; activeGid = used;
-            break;
-          }
-        }catch(e){
-          // try next gid
-          console.warn("gid failed:", gid, e);
+        // Make sure it's actually JSON and not a login page
+        if (!text.includes("google.visualization.Query.setResponse")) {
+          throw new Error("Sheet is not published or URL is wrong.");
         }
-      }
-      if(!rawRows.length){
-        const testUrl = GVIZ_URL(PUBLISHED_DOC_ID, GIDS_TO_TRY[0]);
-        errorOut(
-          `Couldn’t load data. Make sure your tab is published to the web and the gid is correct.
-          <br><small>Test this in your browser: <code>${testUrl}</code></small>`
+
+        const json = JSON.parse(
+          text.substr(47).slice(0, -2) // trim wrapper
         );
-        return;
+
+        const rows = json.table.rows;
+        const tbody = document.querySelector("#leaderboard tbody");
+        tbody.innerHTML = "";
+
+        // find column indexes
+        const headers = json.table.cols.map(col =>
+          col.label.toLowerCase()
+        );
+        const idxName = headers.findIndex(h => h.includes("name"));
+        const idxTier = headers.findIndex(h => h.includes("tier"));
+        const idxScore = headers.findIndex(h => h.includes("score"));
+        const idxCity = headers.findIndex(h => h.includes("city"));
+        const idxDate = headers.findIndex(
+          h => h.includes("time") || h.includes("date")
+        );
+
+        // build data array
+        const data = rows.map(r => ({
+          name: r.c[idxName]?.v || "",
+          tier: r.c[idxTier]?.v || "",
+          score: parseFloat(r.c[idxScore]?.v || 0),
+          city: r.c[idxCity]?.v || "",
+          date: r.c[idxDate]?.v || ""
+        }));
+
+        // sort by score desc
+        data.sort((a, b) => b.score - a.score);
+
+        // render table
+        data.forEach((p, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="rank">#${i + 1}</td>
+            <td class="name">${p.name}</td>
+            <td class="tier">${p.tier}</td>
+            <td>${p.score}</td>
+            <td>${p.city}</td>
+            <td>${p.date}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error(err);
+        document.querySelector("#leaderboard tbody").innerHTML =
+          `<tr><td colspan="6">⚠️ Couldn’t load data — check Publish settings.</td></tr>`;
       }
-      populateCityFilter();
-      applyFilters();
-      render();
     }
 
-    el.search.addEventListener("input", ()=>{applyFilters();render();});
-    el.cityFilter.addEventListener("change", ()=>{applyFilters();render();});
-    el.tierFilter.addEventListener("change", ()=>{applyFilters();render();});
-    el.timeFilter.addEventListener("change", ()=>{applyFilters();render();});
-    el.refresh.addEventListener("click", load);
-
-    load();
-    setInterval(load, 5*60*1000);
+    loadData();
   </script>
 </body>
 </html>
