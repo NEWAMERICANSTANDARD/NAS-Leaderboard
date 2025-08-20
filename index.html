@@ -9,7 +9,7 @@
   <h1>NAS Leaderboard</h1>
   <table id="lb"><thead><tr><th>Rank</th><th>Name</th><th>Tier</th><th>Score</th></tr></thead><tbody></tbody></table>
   <script>
-    const URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT15cYvooOqX2_SicJIooVvhI2gGGWuPhMO0ALpWIcLw-xBPt9V9QFDbtn5CJ1RZZoYeUqEgUnJkfDu/gviz/tq?tqx=out:json&gid=1747425104&tq=select%20*";
+    const URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT15cYvooOqX2_SicJIooVvhI2gGGWuPhMO0ALpWIcLw-xBPt9V9QFDbtn5CJ1RZZoYeUqEgUnJkfDu/pubhtml?gid=1747425104&single=true";
     fetch(URL).then(r => r.text()).then(t => {
       if(!t.includes("setResponse")) throw "Sheet not published correctly.";
       const json = JSON.parse(t.match(/setResponse\((.*)\)/s)[1]);
@@ -32,5 +32,6 @@
   </script>
 </body>
 </html>
+
 
 
