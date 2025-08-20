@@ -1,139 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
   <title>NAS Leaderboard</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #0d1117;
-      color: #e6edf3;
-      margin: 0;
-      padding: 20px;
-      text-align: center;
-    }
-    h1 {
-      margin-bottom: 20px;
-    }
-    table {
-      width: 90%;
-      margin: auto;
-      border-collapse: collapse;
-      background: #161b22;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-    }
-    th, td {
-      padding: 12px 15px;
-      border-bottom: 1px solid #30363d;
-    }
-    th {
-      background: #21262d;
-      color: #58a6ff;
-      text-transform: uppercase;
-      font-size: 14px;
-    }
-    tr:hover {
-      background: #30363d;
-    }
-    .rank {
-      font-weight: bold;
-      color: #ff7b72;
-    }
-    .name {
-      font-weight: bold;
-    }
-    .tier {
-      color: #3fb950;
-    }
-  </style>
 </head>
 <body>
-  <h1>New American Standard Leaderboard</h1>
-  <p>Updated automatically from Google Sheets</p>
-  <table id="leaderboard">
-    <thead>
-      <tr>
-        <th>Rank</th>
-        <th>Name</th>
-        <th>Tier</th>
-        <th>Best Score</th>
-        <th>City</th>
-        <th>Last Submitted</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <script>
-    const SHEET_URL =
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vT15cYvooOqX2_SicJIooVvhI2gGGWuPhMO0ALpWIcLw-xBPt9V9QFDbtn5CJ1RZZoYeUqEgUnJkfDu/gviz/tq?tqx=out:json&gid=1747425104&tq=select%20*";
-
-    async function loadData() {
-      try {
-        const res = await fetch(SHEET_URL);
-        const text = await res.text();
-
-        // Make sure it's actually JSON and not a login page
-        if (!text.includes("google.visualization.Query.setResponse")) {
-          throw new Error("Sheet is not published or URL is wrong.");
-        }
-
-        const json = JSON.parse(
-          text.substr(47).slice(0, -2) // trim wrapper
-        );
-
-        const rows = json.table.rows;
-        const tbody = document.querySelector("#leaderboard tbody");
-        tbody.innerHTML = "";
-
-        // find column indexes
-        const headers = json.table.cols.map(col =>
-          col.label.toLowerCase()
-        );
-        const idxName = headers.findIndex(h => h.includes("name"));
-        const idxTier = headers.findIndex(h => h.includes("tier"));
-        const idxScore = headers.findIndex(h => h.includes("score"));
-        const idxCity = headers.findIndex(h => h.includes("city"));
-        const idxDate = headers.findIndex(
-          h => h.includes("time") || h.includes("date")
-        );
-
-        // build data array
-        const data = rows.map(r => ({
-          name: r.c[idxName]?.v || "",
-          tier: r.c[idxTier]?.v || "",
-          score: parseFloat(r.c[idxScore]?.v || 0),
-          city: r.c[idxCity]?.v || "",
-          date: r.c[idxDate]?.v || ""
-        }));
-
-        // sort by score desc
-        data.sort((a, b) => b.score - a.score);
-
-        // render table
-        data.forEach((p, i) => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td class="rank">#${i + 1}</td>
-            <td class="name">${p.name}</td>
-            <td class="tier">${p.tier}</td>
-            <td>${p.score}</td>
-            <td>${p.city}</td>
-            <td>${p.date}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-      } catch (err) {
-        console.error(err);
-        document.querySelector("#leaderboard tbody").innerHTML =
-          `<tr><td colspan="6">⚠️ Couldn’t load data — check Publish settings.</td></tr>`;
-      }
-    }
-
-    loadData();
-  </script>
+  <h1>NAS Leaderboard</h1>
+  <table id="lb" border="1"><thead><tr><th>Rank</th><th>Name</th><th>Tier</th><th>Score</th></tr></thead><tbody></tbody></table>
+<script>
+const URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT15cYvooOqX2_SicJIooVvhI2gGGWuPhMO0ALpWIcLw-xBPt9V9QFDbtn5CJ1RZZoYeUqEgUnJkfDu/gviz/tq?tqx=out:json&gid=1747425104&tq=select%20*";
+fetch(URL)
+  .then(r => r.text())
+  .then(t => {
+    if (!t.includes("setResponse")) throw "Not published or wrong URL";
+    t = t.match(/setResponse\((.*)\)/s)[1];
+    const json = JSON.parse(t);
+    const cols = json.table.cols.map(c => c.label.toLowerCase());
+    const idx = {
+      name: cols.findIndex(h => h.includes("name")),
+      tier: cols.findIndex(h => h.includes("tier")),
+      score: cols.findIndex(h => h.includes("score"))
+    };
+    const rows = json.table.rows.map((r,i) => ({
+      rank: i+1,
+      name: r.c[idx.name]?.v,
+      tier: r.c[idx.tier]?.v,
+      score: r.c[idx.score]?.v
+    }));
+    const tbody = document.querySelector("#lb tbody");
+    rows.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${r.rank}</td><td>${r.name}</td><td>${r.tier}</td><td>${r.score}</td>`;
+      tbody.appendChild(tr);
+    });
+  }).catch(e => {
+    document.body.innerHTML += `<p style="color:red;">Error loading data: ${e}</p>`;
+    console.error(e);
+  });
+</script>
 </body>
 </html>
