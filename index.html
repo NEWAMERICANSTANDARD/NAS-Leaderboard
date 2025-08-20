@@ -3,42 +3,34 @@
 <head>
   <meta charset="utf-8">
   <title>NAS Leaderboard</title>
+  <style>body { text-align:center; font-family:sans-serif; background:#0a0a0a; color:#fff; } table { margin:auto; border-collapse: collapse; } th, td { padding:8px 12px; border:1px solid #444; }</style>
 </head>
 <body>
   <h1>NAS Leaderboard</h1>
-  <table id="lb" border="1"><thead><tr><th>Rank</th><th>Name</th><th>Tier</th><th>Score</th></tr></thead><tbody></tbody></table>
-<script>
-const URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT15cYvooOqX2_SicJIooVvhI2gGGWuPhMO0ALpWIcLw-xBPt9V9QFDbtn5CJ1RZZoYeUqEgUnJkfDu/gviz/tq?tqx=out:json&gid=1747425104&tq=select%20*
-";
-fetch(URL)
-  .then(r => r.text())
-  .then(t => {
-    if (!t.includes("setResponse")) throw "Not published or wrong URL";
-    t = t.match(/setResponse\((.*)\)/s)[1];
-    const json = JSON.parse(t);
-    const cols = json.table.cols.map(c => c.label.toLowerCase());
-    const idx = {
-      name: cols.findIndex(h => h.includes("name")),
-      tier: cols.findIndex(h => h.includes("tier")),
-      score: cols.findIndex(h => h.includes("score"))
-    };
-    const rows = json.table.rows.map((r,i) => ({
-      rank: i+1,
-      name: r.c[idx.name]?.v,
-      tier: r.c[idx.tier]?.v,
-      score: r.c[idx.score]?.v
-    }));
-    const tbody = document.querySelector("#lb tbody");
-    rows.forEach(r => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${r.rank}</td><td>${r.name}</td><td>${r.tier}</td><td>${r.score}</td>`;
-      tbody.appendChild(tr);
+  <table id="lb"><thead><tr><th>Rank</th><th>Name</th><th>Tier</th><th>Score</th></tr></thead><tbody></tbody></table>
+  <script>
+    const URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT15cYvooOqX2_SicJIooVvhI2gGGWuPhMO0ALpWIcLw-xBPt9V9QFDbtn5CJ1RZZoYeUqEgUnJkfDu/gviz/tq?tqx=out:json&gid=1747425104&tq=select%20*";
+    fetch(URL).then(r => r.text()).then(t => {
+      if(!t.includes("setResponse")) throw "Sheet not published correctly.";
+      const json = JSON.parse(t.match(/setResponse\((.*)\)/s)[1]);
+      const cols = json.table.cols.map(c => c.label.toLowerCase());
+      const rows = json.table.rows.map((r, i) => ({
+        name: r.c[cols.indexOf("name")]?.v || "",
+        tier: r.c[cols.indexOf("highest tier")]?.v || "",
+        score: r.c[cols.indexOf("best score")]?.v || ""
+      }));
+      const tbody = document.querySelector("#lb tbody");
+      rows.forEach((row, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${idx+1}</td><td>${row.name}</td><td>${row.tier}</td><td>${row.score}</td>`;
+        tbody.appendChild(tr);
+      });
+    }).catch(err => {
+      document.body.innerHTML += "<p style='color:red;'>Error loading leaderboard. Check sheet publishing.</p>";
+      console.error(err);
     });
-  }).catch(e => {
-    document.body.innerHTML += `<p style="color:red;">Error loading data: ${e}</p>`;
-    console.error(e);
-  });
-</script>
+  </script>
 </body>
 </html>
+
 
