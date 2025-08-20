@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NAS Leaderboard</title>
+  <style>
+    :root{
+      --bg:#0b0c10; --card:#121317; --muted:#a8b3c1; --text:#e8edf2; --accent:#59d185; --accent2:#7cc7ff;
+      --tableStripe:#0f1116; --chip:#1b1e26;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:1100px;margin:0 auto;padding:28px}
+    header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+    h1{font-size:28px;margin:0}
+    .sub{color:var(--muted);font-size:13px}
+    .controls{display:flex;gap:10px;flex-wrap:wrap}
+    input,select{padding:10px 12px;border:1px solid #22252f;background:#0e1016;color:var(--text);border-radius:10px;outline:none}
+    .card{background:var(--card);border:1px solid #1b1f2a;border-radius:16px;padding:14px}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    thead th{position:sticky;top:0;background:var(--card);z-index:2}
+    th,td{padding:12px 14px;text-align:left;border-bottom:1px solid #1b1f2a}
+    tbody tr:nth-child(odd){background:var(--tableStripe)}
+    .rank{font-weight:700}
+    .chip{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--chip);border:1px solid #252a35;color:#dfe6ee;font-size:12px}
+    .tier{font-weight:700}
+    .num{font-variant-numeric:tabular-nums}
+    .muted{color:var(--muted)}
+    .right{margin-left:auto}
+    .footer{margin-top:10px;color:var(--muted);font-size:12px;display:flex;gap:12px;align-items:center}
+    .btn{cursor:pointer;border:none;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#0a0b0f;padding:10px 14px;border-radius:12px;font-weight:700}
+    @media (max-width:700px){ .hide-sm{display:none} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>NAS Leaderboard</h1>
+        <div class="sub">Ranked by Highest Tier → Best Score → Most Recent</div>
+      </div>
+      <div class="controls">
+        <input id="search" placeholder="Search by name or city…" />
+        <select id="cityFilter"><option value="">All cities</option></select>
+        <select id="tierFilter">
+          <option value="">All tiers</option>
+          <option>5</option><option>4</option><option>3</option><option>2</option><option>1</option>
+        </select>
+        <select id="timeFilter">
+          <option value="">All time</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="365">Last 365 days</option>
+        </select>
+        <button id="refresh" class="btn">Refresh</button>
+      </div>
+    </header>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th class="hide-sm">City</th>
+            <th>Highest&nbsp;Tier</th>
+            <th>Best&nbsp;Score</th>
+            <th class="hide-sm">Last&nbsp;Submitted</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="6" class="muted">Loading…</td></tr>
+        </tbody>
+      </table>
+      <div class="footer">
+        <span id="count">0 athletes</span>
+        <span class="right muted" id="updated"></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SHEET_ID = "1nb8JW_8i4T8nljRsnxTCBz9pFsWJcEfXscvWNakxlgY"; // your sheet ID
+    const SHEET_NAMES = ["Leaderboard", "Form Responses 1", "Sheet1"];
+
+    const GVIZ_URL = (id, name) =>
+      `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}&tq=${encodeURIComponent("select *")}`;
+
+    const el = {
+      tbody: document.getElementById("tbody"),
+      cityFilter: document.getElementById("cityFilter"),
+      tierFilter: document.getElementById("tierFilter"),
+      timeFilter: document.getElementById("timeFilter"),
+      search: document.getElementById("search"),
+      count: document.getElementById("count"),
+      updated: document.getElementById("updated"),
+      refresh: document.getElementById("refresh")
+    };
+
+    let rawRows = [];
+    let displayRows = [];
+    let activeSheetName = null;
+
+    function parseGVizJSON(text){
+      const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}')+1));
+      const rows = json.table.rows.map(r => (r.c||[]).map(c => c ? c.v : ""));
+      const headers = rows[0].map(h => String(h||"").trim());
+
+      const idx = {
+        name: headers.findIndex(h => /name/i.test(h)),
+        city: headers.findIndex(h => /(city|location)/i.test(h)),
+        tier: headers.findIndex(h => /tier/i.test(h)),
+        score: headers.findIndex(h => /score/i.test(h)),
+        last: headers.findIndex(h => /(last.*submitted|timestamp|date)/i.test(h))
+      };
+      if(idx.name<0 || idx.tier<0 || idx.score<0) return [];
+
+      return rows.slice(1).map(r=>{
+        const lastVal = r[idx.last];
+        const lastDate = lastVal ? new Date(lastVal) : null;
+        return {
+          name: r[idx.name] || "",
+          city: r[idx.city] || "",
+          tier: Number(r[idx.tier]||0),
+          score: Number(r[idx.score]||0),
+          last: lastDate && !isNaN(lastDate) ? lastDate : null
+        };
+      });
+    }
+
+    function formatDate(d){
+      if(!d) return "";
+      return d.toLocaleDateString([], {year:'numeric', month:'short', day:'2-digit'});
+    }
+
+    function applyFilters(){
+      const q = el.search.value.trim().toLowerCase();
+      const city = el.cityFilter.value;
+      const tierNum = el.tierFilter.value ? Number(el.tierFilter.value) : 0;
+      const days = parseInt(el.timeFilter.value||"0",10);
+      const cutoff = days ? Date.now()-days*864e5 : 0;
+
+      displayRows = rawRows.filter(r=>{
+        const matchesQ = !q || r.name.toLowerCase().includes(q) || r.city.toLowerCase().includes(q);
+        const matchesCity = !city || r.city === city;
+        const matchesTier = !tierNum || r.tier === tierNum;
+        const matchesTime = !cutoff || (r.last && r.last.getTime()>=cutoff);
+        return matchesQ && matchesCity && matchesTier && matchesTime;
+      });
+
+      displayRows.sort((a,b)=>{
+        if(b.tier!==a.tier) return b.tier-a.tier;
+        if(b.score!==a.score) return b.score-a.score;
+        return (b.last?.getTime()||0) - (a.last?.getTime()||0);
+      });
+    }
+
+    function render(){
+      el.tbody.innerHTML="";
+      if(!displayRows.length){
+        el.tbody.innerHTML=`<tr><td colspan="6" class="muted">No results.</td></tr>`;
+        el.count.textContent="0 athletes";
+        return;
+      }
+      displayRows.forEach((r,i)=>{
+        const badge=["","🥉","🥈","🏅","🏆","👑"][Math.min(r.tier,5)];
+        el.tbody.innerHTML+=`
+          <tr>
+            <td class="rank">${i+1}</td>
+            <td>${r.name}</td>
+            <td class="hide-sm">${r.city}</td>
+            <td><span class="chip tier">${badge||""} Tier ${r.tier}</span></td>
+            <td class="num">${r.score}</td>
+            <td class="hide-sm muted">${formatDate(r.last)}</td>
+          </tr>`;
+      });
+      el.count.textContent=`${displayRows.length} athlete${displayRows.length===1?"":"s"}`;
+      el.updated.textContent="Updated: "+new Date().toLocaleString()+(activeSheetName?" • "+activeSheetName:"");
+    }
+
+    function populateCityFilter(){
+      const cities = Array.from(new Set(rawRows.map(r=>r.city).filter(Boolean))).sort();
+      el.cityFilter.innerHTML=`<option value="">All cities</option>`+cities.map(c=>`<option>${c}</option>`).join("");
+    }
+
+    async function load(){
+      rawRows=[];
+      activeSheetName=null;
+      for(const name of SHEET_NAMES){
+        try{
+          const res=await fetch(GVIZ_URL(SHEET_ID,name),{cache:"no-store"});
+          const text=await res.text();
+          const rows=parseGVizJSON(text);
+          if(rows.length){rawRows=rows;activeSheetName=name;break;}
+        }catch(e){console.warn("Failed sheet:",name,e);}
+      }
+      if(!rawRows.length){
+        el.tbody.innerHTML=`<tr><td colspan="6" class="muted">Could not load data. Make sure the sheet is Published to the web and headers are correct.</td></tr>`;
+        return;
+      }
+      populateCityFilter();
+      applyFilters();
+      render();
+    }
+
+    el.search.addEventListener("input",()=>{applyFilters();render();});
+    el.cityFilter.addEventListener("change",()=>{applyFilters();render();});
+    el.tierFilter.addEventListener("change",()=>{applyFilters();render();});
+    el.timeFilter.addEventListener("change",()=>{applyFilters();render();});
+    el.refresh.addEventListener("click",load);
+
+    load();
+    setInterval(load,5*60*1000);
+  </script>
+</body>
+</html>
